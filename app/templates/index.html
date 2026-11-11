@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RSS Reader</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-icon">📰</span>
+      <span class="brand-name">RSS Reader</span>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Источники</div>
+      <div class="toolbar">
+        <button class="btn btn-primary btn-sm" id="btnRefreshAll">Обновить всё</button>
+        <button class="btn btn-outline btn-sm" id="btnAddFeed">Добавить</button>
+      </div>
+      <div id="feedList" class="feed-list"></div>
+      <div id="emptyFeeds" class="empty">Источники не добавлены</div>
+    </div>
+
+    <div class="section stats">
+      <div class="section-title">Статистика</div>
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value" id="statTotalFeeds">0</div>
+          <div class="stat-label">Источники</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statTotalArticles">0</div>
+          <div class="stat-label">Публикации</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statUnread">0</div>
+          <div class="stat-label">Непрочитано</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statFavorites">0</div>
+          <div class="stat-label">Избранное</div>
+        </div>
+      </div>
+      <div class="stat-updated" id="statUpdated">Последнее обновление: —</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="header">
+      <div class="header-left">
+        <h1 id="pageTitle">Лента публикаций</h1>
+        <span class="badge" id="currentFeedBadge"></span>
+      </div>
+      <div class="header-right">
+        <div class="search-box">
+          <input type="text" id="searchInput" placeholder="Поиск по названию, описанию, источнику...">
+        </div>
+        <div class="filters">
+          <label class="filter-chip"><input type="checkbox" id="filterUnread"> Непрочитанные</label>
+          <label class="filter-chip"><input type="checkbox" id="filterFavorites"> Избранное</label>
+        </div>
+        <button class="btn btn-primary" id="btnRefreshCurrent">Обновить</button>
+      </div>
+    </header>
+
+    <div class="toolbar-bottom">
+      <div class="pagination-info" id="paginationInfo"></div>
+      <div class="pagination-controls">
+        <button class="btn btn-outline btn-sm" id="btnPrev" disabled>Назад</button>
+        <button class="btn btn-outline btn-sm" id="btnNext" disabled>Вперед</button>
+      </div>
+    </div>
+
+    <div id="articleGrid" class="article-grid"></div>
+
+    <div id="errorBanner" class="error-banner" style="display:none;"></div>
+    <div id="successBanner" class="success-banner" style="display:none;"></div>
+
+    <dialog id="addFeedDialog" class="dialog">
+      <div class="dialog-content">
+        <div class="dialog-header">
+          <h3>Добавить источник</h3>
+          <button class="dialog-close" id="dlgClose">×</button>
+        </div>
+        <div class="dialog-body">
+          <div class="form-group">
+            <label>URL RSS/Atom ленты</label>
+            <input type="text" id="dlgFeedUrl" placeholder="https://example.com/feed">
+            <p class="form-hint">Поддерживаются RSS 2.0, RSS 1.0 и Atom</p>
+          </div>
+          <div id="dlgError" class="form-error" style="display:none;"></div>
+        </div>
+        <div class="dialog-actions">
+          <button class="btn btn-outline" id="dlgCancel">Отмена</button>
+          <button class="btn btn-primary" id="dlgAdd">Добавить</button>
+        </div>
+      </div>
+    </dialog>
+  </main>
+</div>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>
