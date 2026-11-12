@@ -1,9 +1,14 @@
 """SQLAlchemy database setup and session management."""
 
+from pathlib import Path
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-DATABASE_URL = "sqlite:///./data/rss_reader.db"
+DATA_DIR = Path("data")
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+DATABASE_URL = f"sqlite:///{DATA_DIR / 'rss_reader.db'}"
 
 engine = create_engine(
     DATABASE_URL,
