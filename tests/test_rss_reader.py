@@ -286,3 +286,58 @@ def test_api_stats(client):
     assert "total_articles" in data
     assert "unread" in data
     assert "favorites" in data
+
+
+# --- Redirect / SSRF regression tests (in-memory HTTP transport) ---
+
+def _patch_async_client(monkeypatch, handler):
+    """Route rss_parser's HTTP client through an in-memory transport."""
+    import httpx
+    import app.services.rss_parser as parser_mod
+
+    real_client = httpx.AsyncClient
+    transport = httpx.MockTransport(handler)
+
+    def factory(*args, **kwargs):
+        kwargs["transport"] = transport
+        return real_client(*args, **kwargs)
+
+    monkeypatch.setattr(parser_mod.httpx, "AsyncClient", factory)
+    return parser_mod
+
+
+def test_redirect_to_private_host_rejected(monkeypatch):
+    import httpx
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url) == "http://public.example/feed":
+            return httpx.Response(
+                302,
+                headers={"Location": "http://127.0.0.1:8080/admin"},
+                request=request,
+            )
+        raise AssertionError("the redirect target must not be requested")
+
+    parser_mod = _patch_async_client(monkeypatch, handler)
+    # Keep the initial host permitted; the private target must still be blocked.
+    monkeypatch.setattr(parser_mod, "_is_blocked_host", lambda host: host == "127.0.0.1")
+
+    with pytest.raises(FeedParserError):
+        asyncio.run(parser_mod._fetch_feed_content("http://public.example/feed"))
+
+
+def test_valid_relative_redirect_is_followed(monkeypatch):
+    import httpx
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url) == "http://public.example/feed":
+            return httpx.Response(301, headers={"Location": "/final/feed"}, request=request)
+        if str(request.url) == "http://public.example/final/feed":
+            return httpx.Response(200, text="<rss></rss>", request=request)
+        raise AssertionError(f"unexpected URL: {request.url}")
+
+    parser_mod = _patch_async_client(monkeypatch, handler)
+    monkeypatch.setattr(parser_mod, "_is_blocked_host", lambda host: False)
+
+    text = asyncio.run(parser_mod._fetch_feed_content("http://public.example/feed"))
+    assert text == "<rss></rss>"

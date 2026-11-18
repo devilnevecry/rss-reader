@@ -7,7 +7,7 @@ import ipaddress
 import re
 from datetime import datetime, timezone
 from typing import Optional
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import feedparser
 import httpx
@@ -73,27 +73,43 @@ def _validate_url(url: str) -> str:
 
 
 async def _fetch_feed_content(url: str) -> str:
-    """Download feed content with size and redirect limits."""
+    """Download feed content with size, redirect and SSRF limits.
+
+    Redirects are followed manually so that every target is run through the
+    same :func:`_validate_url` checks as the initial URL. Letting httpx follow
+    them automatically would allow a permitted host to redirect into the
+    loopback/private address space.
+    """
     client = httpx.AsyncClient(
         timeout=httpx.Timeout(REQUEST_TIMEOUT),
-        follow_redirects=True,
-        max_redirects=MAX_REDIRECTS,
+        follow_redirects=False,
         headers={"User-Agent": "RSS-Reader/0.1 (+https://example.com)"},
     )
     try:
-        response = await client.get(url)
-        response.raise_for_status()
+        current_url = url
+        redirects = 0
+        while True:
+            response = await client.get(current_url)
+            location = response.headers.get("location")
+            if location and 300 <= response.status_code < 400:
+                if redirects >= MAX_REDIRECTS:
+                    raise FeedParserError("Слишком много перенаправлений.")
+                redirects += 1
+                current_url = _validate_url(urljoin(str(response.url), location))
+                continue
 
-        content = response.content
-        if len(content) > MAX_DOWNLOAD_BYTES:
-            raise FeedParserError("Превышен максимальный размер загружаемой ленты (2 МБ).")
+            response.raise_for_status()
 
-        content_type = response.headers.get("content-type", "")
-        if not any(token in content_type.lower() for token in ("xml", "rss", "atom", "feed")):
-            # Still try to parse; some servers misreport content-type.
-            pass
+            content = response.content
+            if len(content) > MAX_DOWNLOAD_BYTES:
+                raise FeedParserError("Превышен максимальный размер загружаемой ленты (2 МБ).")
 
-        return content.decode(response.encoding or "utf-8", errors="replace")
+            content_type = response.headers.get("content-type", "")
+            if not any(token in content_type.lower() for token in ("xml", "rss", "atom", "feed")):
+                # Still try to parse; some servers misreport content-type.
+                pass
+
+            return content.decode(response.encoding or "utf-8", errors="replace")
     except httpx.HTTPStatusError as exc:
         raise FeedParserError(f"Сервер вернул ошибку {exc.response.status_code} при загрузке ленты.") from exc
     except httpx.TooManyRedirects as exc:
